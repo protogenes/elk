@@ -85,6 +85,9 @@ public final class LabelDummyInserter implements ILayoutProcessor<LGraph> {
                         LLabel label = iterator.next();
                         
                         if (label.getProperty(LayeredOptions.EDGE_LABELS_PLACEMENT) == EdgeLabelPlacement.CENTER) {
+                            dummyNode.getPosition().set(label.getPosition());
+                            dummyNode.setProperty(InternalProperties.ORIGINAL_DUMMY_NODE_POSITION, label.getPosition().y);
+
                             // The way we stack labels depends on the layout direction
                             if (layoutDirection.isVertical()) {
                                 dummySize.x += label.getSize().x + labelLabelSpacing;
