@@ -241,13 +241,9 @@ public final class GraphTransformer implements ILayoutProcessor<LGraph> {
                     }
                     
                     // Mirror junction points
-                    KVectorChain junctionPoints = edge.getProperty(LayeredOptions.JUNCTION_POINTS);
-                    if (junctionPoints != null) {
-                        for (KVector jp : junctionPoints) {
-                            mirrorX(jp, offset);
-                        }
-                    }
-                    
+                    mirrorX(edge.getProperty(LayeredOptions.JUNCTION_POINTS), offset);
+                    mirrorX(edge.getProperty(InternalProperties.ORIGINAL_BENDPOINTS), offset);
+
                     // Mirror edge label positions
                     for (LLabel label : edge.getLabels()) {
                         mirrorX(label.getPosition(), offset - label.getSize().x);
@@ -270,6 +266,20 @@ public final class GraphTransformer implements ILayoutProcessor<LGraph> {
             for (LLabel label : node.getLabels()) {
                 mirrorNodeLabelPlacementX(label);
                 mirrorX(label.getPosition(), nodeSize.x - label.getSize().x);
+            }
+        }
+    }
+
+    /**
+     * Mirror the x coordinate of all vectors in the given chain and add an offset.
+     *
+     * @param chain  a vector chain to mirror
+     * @param offset offset for the x coordinate
+     */
+    private void mirrorX(final KVectorChain chain, final double offset) {
+        if (chain != null) {
+            for (KVector jp : chain) {
+                mirrorX(jp, offset);
             }
         }
     }
@@ -440,13 +450,9 @@ public final class GraphTransformer implements ILayoutProcessor<LGraph> {
                     }
                     
                     // Mirror junction points
-                    KVectorChain junctionPoints = edge.getProperty(LayeredOptions.JUNCTION_POINTS);
-                    if (junctionPoints != null) {
-                        for (KVector jp : junctionPoints) {
-                            mirrorY(jp, offset);
-                        }
-                    }
-                    
+                    mirrorY(edge.getProperty(LayeredOptions.JUNCTION_POINTS), offset);
+                    mirrorY(edge.getProperty(InternalProperties.ORIGINAL_BENDPOINTS), offset);
+    
                     // Mirror edge label positions
                     for (LLabel label : edge.getLabels()) {
                         mirrorY(label.getPosition(), offset - label.getSize().y);
@@ -469,6 +475,20 @@ public final class GraphTransformer implements ILayoutProcessor<LGraph> {
             for (LLabel label : node.getLabels()) {
                 mirrorNodeLabelPlacementY(label);
                 mirrorY(label.getPosition(), nodeSize.y - label.getSize().y);
+            }
+        }
+    }
+    
+    /**
+     * Mirror the y coordinate of all vectors in the given chain and add an offset.
+     *
+     * @param chain  a vector chain to mirror
+     * @param offset offset for the x coordinate
+     */
+    private void mirrorY(KVectorChain chain, double offset) {
+        if (chain != null) {
+            for (KVector jp : chain) {
+                mirrorY(jp, offset);
             }
         }
     }
@@ -604,15 +624,10 @@ public final class GraphTransformer implements ILayoutProcessor<LGraph> {
                     for (KVector bendPoint : edge.getBendPoints()) {
                         transpose(bendPoint);
                     }
-                    
-                    // Transpose junction points
-                    KVectorChain junctionPoints = edge.getProperty(LayeredOptions.JUNCTION_POINTS);
-                    if (junctionPoints != null) {
-                        for (KVector jp : junctionPoints) {
-                            transpose(jp);
-                        }
-                    }
-                    
+    
+                    transpose(edge.getProperty(LayeredOptions.JUNCTION_POINTS));
+                    transpose(edge.getProperty(InternalProperties.ORIGINAL_BENDPOINTS));
+
                     // Transpose edge labels
                     for (LLabel label : edge.getLabels()) {
                         transpose(label.getPosition());
@@ -638,6 +653,19 @@ public final class GraphTransformer implements ILayoutProcessor<LGraph> {
                 transposeNodeLabelPlacement(label);
                 transpose(label.getSize());
                 transpose(label.getPosition());
+            }
+        }
+    }
+    
+    /**
+     * Transpose the x and y coordinate of all vectors in the given chain.
+     *
+     * @param chain a vector chain
+     */
+    private void transpose(KVectorChain chain) {
+        if (chain != null) {
+            for (KVector jp : chain) {
+                transpose(jp);
             }
         }
     }
