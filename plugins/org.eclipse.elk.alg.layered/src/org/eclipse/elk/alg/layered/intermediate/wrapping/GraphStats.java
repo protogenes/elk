@@ -334,14 +334,14 @@ public class GraphStats {
         for (LNode tgt: layer.getNodes()) {
             for (LEdge e : tgt.getIncomingEdges()) {
                 // check for different source
-                if (n1 != null && n1 != tgt) {
+                if (n1 != null && n1 != tgt || tgt.getType() == NodeType.LONG_EDGE) {
                     cutAllowed = false;
                     break check;
                 }
                 n1 = tgt;
                 // check for different target
                 LNode src = e.getSource().getNode();
-                if (n2 != null && n2 != src) {
+                if (n2 != null && n2 != src || src.getType() == NodeType.LONG_EDGE) {
                     cutAllowed = false;
                     break check;
                 }

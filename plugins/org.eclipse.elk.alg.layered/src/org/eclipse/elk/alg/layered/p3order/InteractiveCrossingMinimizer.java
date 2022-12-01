@@ -15,11 +15,11 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
+import com.google.common.base.MoreObjects;
 import org.eclipse.elk.alg.layered.LayeredPhases;
 import org.eclipse.elk.alg.layered.graph.LEdge;
 import org.eclipse.elk.alg.layered.graph.LGraph;
 import org.eclipse.elk.alg.layered.graph.LNode;
-import org.eclipse.elk.alg.layered.graph.LNode.NodeType;
 import org.eclipse.elk.alg.layered.graph.LPort;
 import org.eclipse.elk.alg.layered.graph.Layer;
 import org.eclipse.elk.alg.layered.intermediate.IntermediateProcessorStrategy;
@@ -84,35 +84,24 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
         layerIndex = 0;
         for (Layer layer : layeredGraph) {
             // determine a horizontal position for edge bend points comparison
-            double horizPos = 0;
-            int nodeCount = 0;
+            double left = Double.POSITIVE_INFINITY;
+            double right = Double.NEGATIVE_INFINITY;
             for (LNode node : layer.getNodes()) {
                 if (node.getPosition().x > 0) {
-                    horizPos += node.getPosition().x + node.getSize().x / 2;
-                    nodeCount++;
+                    left = Math.min(left, node.getPosition().x);
+                    right = Math.max(right, node.getPosition().x + node.getSize().x);
                 }
                 for (LPort port : node.getPorts()) {
                     port.id = portCount++;
                 }
             }
-            
-            if (nodeCount > 0) {
-                horizPos /= nodeCount;
-            }
-            
+
             // create an array of vertical node positions
             final double[] pos = new double[layer.getNodes().size()];
             int nextIndex = 0;
             for (LNode node : layer) {
                 node.id = nextIndex++;
-                pos[node.id] = getPos(node, horizPos);
-                
-                // if we have a long edge dummy node, save the calculated position in a property
-                // to be used by the interactive node placer (for dummy nodes other than long edge
-                // dummies, we haven't calculated meaningful positions)
-                if (node.getType() == NodeType.LONG_EDGE) {
-                    node.setProperty(InternalProperties.ORIGINAL_DUMMY_NODE_POSITION, pos[node.id]);
-                }
+                pos[node.id] = getPos(node, left, right);
             }
             
             // sort the nodes using the position array
@@ -149,58 +138,45 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
      * Determine a vertical position for the given node.
      * 
      * @param node a node
-     * @param horizPos the horizontal position at which to measure (relevant for edges)
+     * @param left left most position of the layer's nodes
+     * @param right right most position of the layer's nodes
      * @return the vertical position used for sorting
      */
-    private double getPos(final LNode node, final double horizPos) {
+    private double getPos(final LNode node, final double left, final double right) {
         switch (node.getType()) {
         case LONG_EDGE:
             LEdge edge = (LEdge) node.getProperty(InternalProperties.ORIGIN);
             
             // reconstruct the original bend points from the node annotations
             KVectorChain bendpoints = edge.getProperty(InternalProperties.ORIGINAL_BENDPOINTS);
-            if (bendpoints == null) {
-                bendpoints = new KVectorChain();
-            } else if (edge.getProperty(InternalProperties.REVERSED)) {
-                bendpoints = KVectorChain.reverse(bendpoints);
-            }
-            
-            // Check if we can determine the position just by using the source point, if we can determine it
-            LPort source = node.getProperty(InternalProperties.LONG_EDGE_SOURCE);
-            if (source != null) {
-                KVector sourcePoint = source.getAbsoluteAnchor();
-                if (horizPos <= sourcePoint.x) {
-                    return sourcePoint.y;
+
+            KVector leftNeighbour = node.getProperty(InternalProperties.LONG_EDGE_SOURCE).getAbsoluteAnchor();
+            KVector rightNeighbour = node.getProperty(InternalProperties.LONG_EDGE_TARGET).getAbsoluteAnchor();
+            if (bendpoints != null) {
+                for (KVector bend : bendpoints) {
+                    if (leftNeighbour.x < bend.x && bend.x < left || // outside, but closer to boundary
+                            left <= bend.x && bend.x < leftNeighbour.x || // inside, but closer to boundary
+                            leftNeighbour.x < left && left <= bend.x && bend.x < right) { // inside
+                        leftNeighbour = bend;
+                    }
+                    if (right <= bend.x && bend.x < rightNeighbour.x ||
+                            rightNeighbour.x < bend.x && bend.x <= right ||
+                            left < bend.x && bend.x <= right && right < rightNeighbour.x) {
+                        rightNeighbour = bend;
+                    }
                 }
-                
-                bendpoints.addFirst(sourcePoint);
             }
-            
-            // Check if we can determine the position just by using the target point
-            LPort target = node.getProperty(InternalProperties.LONG_EDGE_TARGET);
-            if (target != null) {
-                KVector targetPoint = target.getAbsoluteAnchor();
-                if (targetPoint.x <= horizPos) {
-                    return targetPoint.y;
-                }
-                
-                bendpoints.addLast(targetPoint);
-            }
-            
-            // Find the two points along the edge that the horizontal point lies between
-            if (bendpoints.size() >= 2) {
-                Iterator<KVector> pointIter = bendpoints.iterator();
-                KVector point1 = pointIter.next();
-                KVector point2 = pointIter.next();
-                while (point2.x < horizPos && pointIter.hasNext()) {
-                    point1 = point2;
-                    point2 = pointIter.next();
-                }
-                return point1.y + (horizPos - point1.x) / (point2.x - point1.x) * (point2.y - point1.y);
-            }
-            
-            break;
-            
+
+            double result = (leftNeighbour.y + rightNeighbour.y) * .5;
+//            if (leftNeighbour.x >= left || rightNeighbour.x <= right) {
+                // if we have a long edge dummy node, save the calculated position in a property
+                // to be used by the interactive node placer (for dummy nodes other than long edge
+                // dummies, we haven't calculated meaningful positions)
+                node.setProperty(InternalProperties.ORIGINAL_DUMMY_NODE_POSITION, result);
+//            }
+            node.getPosition().set((left + right) * .5, result);
+            return result;
+
         case NORTH_SOUTH_PORT:
             // Get one of the ports the dummy node was created for, and its original node
             LPort originPort = (LPort) node.getPorts().get(0).getProperty(InternalProperties.ORIGIN);
