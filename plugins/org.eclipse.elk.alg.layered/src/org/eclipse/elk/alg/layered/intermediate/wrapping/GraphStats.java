@@ -334,7 +334,7 @@ public class GraphStats {
         for (LNode tgt: layer.getNodes()) {
             for (LEdge e : tgt.getIncomingEdges()) {
                 // check for different source
-                if (n1 != null && n1 != tgt || tgt.getType() == NodeType.LONG_EDGE) {
+                if (n1 != null && n1 != tgt || tgt.getType() == NodeType.LONG_EDGE || !e.getProperty(LayeredOptions.WRAPPING_VALIDIFY_ALLOW_CUT)) {
                     cutAllowed = false;
                     break check;
                 }
