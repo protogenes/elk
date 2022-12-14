@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2011, 2019 Kiel University and others.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
  * http://www.eclipse.org/legal/epl-2.0.
@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
-import com.google.common.base.MoreObjects;
 import org.eclipse.elk.alg.layered.LayeredPhases;
 import org.eclipse.elk.alg.layered.graph.LEdge;
 import org.eclipse.elk.alg.layered.graph.LGraph;
@@ -34,7 +33,7 @@ import org.eclipse.elk.core.util.IElkProgressMonitor;
 
 /**
  * A crossing minimizer that allows user interaction by respecting previous node positions.
- * 
+ *
  * <dl>
  *   <dt>Preconditions:</dt>
  *     <dd>The graph has a proper layering</dd>
@@ -54,29 +53,29 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
             .addBefore(LayeredPhases.P3_NODE_ORDERING, IntermediateProcessorStrategy.LONG_EDGE_SPLITTER)
             .addBefore(LayeredPhases.P4_NODE_PLACEMENT, IntermediateProcessorStrategy.IN_LAYER_CONSTRAINT_PROCESSOR)
             .addAfter(LayeredPhases.P5_EDGE_ROUTING, IntermediateProcessorStrategy.LONG_EDGE_JOINER);
-    
+
     @Override
     public LayoutProcessorConfiguration<LayeredPhases, LGraph> getLayoutProcessorConfiguration(final LGraph graph) {
         LayoutProcessorConfiguration<LayeredPhases, LGraph> configuration =
                 LayoutProcessorConfiguration.createFrom(INTERMEDIATE_PROCESSING_CONFIGURATION);
-        
+
         if (graph.getProperty(InternalProperties.GRAPH_PROPERTIES).contains(GraphProperties.NON_FREE_PORTS)) {
             configuration.addBefore(LayeredPhases.P3_NODE_ORDERING, IntermediateProcessorStrategy.PORT_LIST_SORTER);
         }
-        
+
         return configuration;
     }
 
     @Override
     public void process(final LGraph layeredGraph, final IElkProgressMonitor monitor) {
         monitor.begin("Interactive crossing minimization", 1);
-        
+
         // Set ID's for each layer since they will be used by the port distribution code to index into arrays
         int layerIndex = 0;
         for (Layer layer : layeredGraph.getLayers()) {
             layer.id = layerIndex++;
         }
-        
+
         LNode[][] nodeOrder = layeredGraph.toNodeArray();
         AbstractBarycenterPortDistributor portDistributor = new NodeRelativePortDistributor(nodeOrder.length);
         IInitializable.init(Arrays.asList(portDistributor), nodeOrder);
@@ -87,7 +86,7 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
             double left = Double.POSITIVE_INFINITY;
             double right = Double.NEGATIVE_INFINITY;
             for (LNode node : layer.getNodes()) {
-                if (node.getPosition().x > 0) {
+                if (node.getType() == LNode.NodeType.NORMAL || node.getType() == LNode.NodeType.LABEL) {
                     left = Math.min(left, node.getPosition().x);
                     right = Math.max(right, node.getPosition().x + node.getSize().x);
                 }
@@ -103,12 +102,12 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
                 node.id = nextIndex++;
                 pos[node.id] = getPos(node, left, right);
             }
-            
+
             // sort the nodes using the position array
             Collections.sort(layer.getNodes(), new Comparator<LNode>() {
                 public int compare(final LNode node1, final LNode node2) {
                     int compare = Double.compare(pos[node1.id], pos[node2.id]);
-                    
+
                     if (compare == 0) {
                         // The two nodes have the same y coordinate. Check for node successor
                         // constraints
@@ -116,27 +115,27 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
                                 node1.getProperty(InternalProperties.IN_LAYER_SUCCESSOR_CONSTRAINTS);
                         List<LNode> node2Successors =
                                 node2.getProperty(InternalProperties.IN_LAYER_SUCCESSOR_CONSTRAINTS);
-                        
+
                         if (node1Successors.contains(node2)) {
                             return -1;
                         } else if (node2Successors.contains(node1)) {
                             return 1;
                         }
                     }
-                    
+
                     return compare;
                 }
             });
             portDistributor.distributePortsWhileSweeping(nodeOrder, layerIndex, true);
             layerIndex++;
         }
-        
+
         monitor.done();
     }
-    
+
     /**
      * Determine a vertical position for the given node.
-     * 
+     *
      * @param node a node
      * @param left left most position of the layer's nodes
      * @param right right most position of the layer's nodes
@@ -146,7 +145,7 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
         switch (node.getType()) {
         case LONG_EDGE:
             LEdge edge = (LEdge) node.getProperty(InternalProperties.ORIGIN);
-            
+
             // reconstruct the original bend points from the node annotations
             KVectorChain bendpoints = edge.getProperty(InternalProperties.ORIGINAL_BENDPOINTS);
 
@@ -181,7 +180,7 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
             // Get one of the ports the dummy node was created for, and its original node
             LPort originPort = (LPort) node.getPorts().get(0).getProperty(InternalProperties.ORIGIN);
             LNode originNode = originPort.getNode();
-            
+
             switch (originPort.getSide()) {
             case NORTH:
                 // Use the position of the node's northern side. This causes northern dummies to
@@ -189,17 +188,17 @@ public final class InteractiveCrossingMinimizer implements ILayoutPhase<LayeredP
                 // used as the anchor point. We solve this when sorting the nodes by y coordinate
                 // by respecting node successor constraints.
                 return originNode.getPosition().y;
-            
+
             case SOUTH:
                 // Use the position of the node's southern side
                 return originNode.getPosition().y + originNode.getSize().y;
             }
-            
+
             break;
 
         // FIXME What about the other node types?
         }
-        
+
         // the fallback solution is to take the previous position of the node's anchor point
         return node.getInteractiveReferencePoint().y;
     }
